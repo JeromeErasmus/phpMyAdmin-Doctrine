@@ -1,0 +1,36 @@
+
+
+phpMyAdmin Doctrine 2 - Readme
+==============================
+
+  Set of functions used to build Doctrine 2 dumps of tables
+
+  Version 0.1
+  ---------------
+  http://www.developermill.com/
+
+  Copyright (C) 2011 Jerome Erasmus 
+
+  Requirements:
+    php 5.2 or later
+    MySQL 5.0 or later
+    phpMyAdmin 3.2.0.1 or later (earlier versions have not been tested)
+
+
+  Summary:
+    phpMyAdmin-Doctrine is a plugin for phpMyAdmin to allow you to export Doctrine 2 model class files from your existing MySQL database.
+
+
+  Download:
+    You can get the newest version at https://github.com/JeromeErasmus/phpMyAdmin-Doctrine
+
+
+  Installation:
+    1) Place the doctrine2.php in phpMyAdmin's '/libraries/export' folder.
+    2) go to phpMyAdmin's export tab and see "Doctrine 2" is avaliable under the list of export options.
+
+
+
+
+    Enjoy!
+       
