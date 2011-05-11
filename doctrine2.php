@@ -4,8 +4,10 @@
  * Set of functions used to build Doctrine 2 dumps of tables
  *
  * @package phpMyAdmin-Export-Doctrine2 PHP
-
+ *
+ * @author jerome Erasmus 2011 www.developermill.com
  */
+
 if (! defined('PHPMYADMIN')) {
     exit;
 }
@@ -230,78 +232,79 @@ class TableProperty
 	}
 }
 
+    // inserts Doctrine metadata for field
+    function insertFieldMetadata($tablePropertie)
+    {
+        $count = 0;
+        $str  =  "\t/**\n";
+        $str .=  "\t * @Column(";
+        foreach ($tablePropertie as $key => $val)
+        {
+            if(!empty($val))
+            {
+               if($count > 0 )
+                    $str .= ',';
+
+               $str .=  $key.'="'.$val.'"';
+            }
+
+            $count++;
+        }
+        $str .=  ")";
+        $str .=  "\n\t */";
+
+        return $str;
+    }
+
+
+
 	function handleDoctrine2PHPBody($db, $table, $crlf)
 	{
-		$lines=array();
+        $lines=array();
 		$result=PMA_DBI_query(sprintf("DESC %s.%s", PMA_backquote($db), PMA_backquote($table)));
-		if ($result)
+
+       //  $sql = sprintf("DESC %s.%s", PMA_backquote($db), PMA_backquote($table);
+
+        if ($result)
 		{
 			$tableProperties=array();
 			while ($row = PMA_DBI_fetch_row($result))
-				$tableProperties[] = new TableProperty($row);
-			$lines[] = "using System;";
-			$lines[] = "using System.Collections;";
-			$lines[] = "using System.Collections.Generic;";
-			$lines[] = "using System.Text;";
-			$lines[] = "namespace ".ucfirst($db);
+            {
+               $tableProperties[] = new TableProperty($row);
+            }
+           // $lines[] = print_r($tableProperties);
+            $lines[] = "<?php\n";
+			$lines[] = "namespace models;";
+            $lines[] = "\n/**\n * @Entity\n * @Table(name='".$table."')\n */\n";
+
+			$lines[] = "public class ".ucfirst($table);
 			$lines[] = "{";
-			$lines[] = "	#region ".ucfirst($table);
-			$lines[] = "	public class ".ucfirst($table);
-			$lines[] = "	{";
-			$lines[] = "		#region Member Variables";
+
 			foreach ($tableProperties as $tablePropertie)
-				$lines[] = $tablePropertie->format("		protected #phpPrimitiveType# _#name#;");
-			$lines[] = "		#endregion";
-			$lines[] = "		#region Constructors";
-			$lines[] = "		public ".ucfirst($table)."() { }";
-			$temp = array();
+            {
+                $lines[] =  insertFieldMetadata($tablePropertie);
+                $lines[] = $tablePropertie->format("	private $#name#;\n");
+            }
+
+			$lines[] = "\n";
 			foreach ($tableProperties as $tablePropertie)
-				if (! $tablePropertie->isPK())
-					$temp[] = $tablePropertie->format("#phpPrimitiveType# #name#");
-			$lines[] = "		public ".ucfirst($table)."(".implode(", ", $temp).")";
-			$lines[] = "		{";
-			foreach ($tableProperties as $tablePropertie)
-				if (! $tablePropertie->isPK())
-					$lines[] = $tablePropertie->format("			this._#name#=#name#;");
-			$lines[] = "		}";
-			$lines[] = "		#endregion";
-			$lines[] = "		#region Public Properties";
-			foreach ($tableProperties as $tablePropertie)
-				$lines[] = $tablePropertie->format("		public virtual #phpPrimitiveType# _#ucfirstName#\n		{\n			get {return _#name#;}\n			set {_#name#=value;}\n		}");
-			$lines[] = "		#endregion";
-			$lines[] = "	}";
-			$lines[] = "	#endregion";
-			$lines[] = "}";
+            {
+                $lines[] = $tablePropertie->format("	public function get #name#() \n\t{\n\t\treturn \$this->#name#;\n\t} \n");
+                $lines[] = $tablePropertie->format("	public function set #name#($#name#) \n\t{\n\t\t\$this->#name# = \$#name#;\n\t} \n");
+            }
+
+			$lines[] = "}\n?>\n\n";
+
 
 			PMA_DBI_free_result($result);
 		}
 		return implode("\n", $lines);
+
 	}
 
 	function handleDoctrine2XMLBody($db, $table, $crlf)
 	{
-		$lines=array();
-		$lines[] = "<?xml version=\"1.0\" encoding=\"utf-8\" ?>";
-		$lines[] = "<hibernate-mapping xmlns=\"urn:nhibernate-mapping-2.2\" namespace=\"".ucfirst($db)."\" assembly=\"".ucfirst($db)."\">";
-		$lines[] = "	<class name=\"".ucfirst($table)."\" table=\"".$table."\">";
-		$result = PMA_DBI_query(sprintf("DESC %s.%s", PMA_backquote($db), PMA_backquote($table)));
-		if ($result)
-		{
-			$tableProperties = array();
-			while ($row = PMA_DBI_fetch_row($result))
-				$tableProperties[] = new TableProperty($row);
-			foreach ($tableProperties as $tablePropertie)
-			{
-				if ($tablePropertie->isPK())
-					$lines[] = $tablePropertie->format("		<id name=\"#ucfirstName#\" type=\"#phpObjectType#\" unsaved-value=\"0\">\n			<column name=\"#name#\" sql-type=\"#type#\" not-null=\"#notNull#\" unique=\"#unique#\" index=\"PRIMARY\"/>\n			<generator class=\"native\" />\n		</id>");
-				else
-					$lines[] = $tablePropertie->format("		<property name=\"#ucfirstName#\" type=\"#phpObjectType#\">\n			<column name=\"#name#\" sql-type=\"#type#\" not-null=\"#notNull#\" #indexName#/>\n		</property>");
-			}
-			PMA_DBI_free_result($result);
-		}
-		$lines[]="	</class>";
-		$lines[]="</hibernate-mapping>";
-		return implode("\n", $lines);
+
 	}
 
 	function cgGetOption($optionName)
