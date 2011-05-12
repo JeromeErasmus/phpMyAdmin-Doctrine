@@ -217,7 +217,7 @@ class TableProperty
          $obj = new stdClass;
 
         // extract type
-       if (strpos($this->type, "varchar") === 0) $obj->type = "string";
+        if (strpos($this->type, "varchar") === 0) $obj->type = "string";
         if (strpos($this->type, "smallint") === 0) $obj->type = "smallint";
         if (strpos($this->type, "bigint") === 0) $obj->type = "bigint";
         if (strpos($this->type, "int") === 0) $obj->type = "integer";
@@ -392,7 +392,7 @@ class TableProperty
 			$lines[] = "namespace models;";
             $lines[] = "\n/**\n * @Entity\n * @Table(name=\"".$table."\")\n */\n";
 
-			$lines[] = "class ".toCamelCase( $table, true ).' {';
+			$lines[] = "class ".toCamelCase( $table, true )." {\n\n\n";
 
 			foreach ($tableProperties as $tablePropertie)
             {
