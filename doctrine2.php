@@ -256,6 +256,8 @@ class TableProperty
         $text=str_replace("#phpObjectType#", $this->getPHPObjectType(), $text);
 		$text=str_replace("#indexName#", $this->getIndexName(), $text);
 
+        $text=str_replace("#key#", "AUTO", $text);
+        $text=str_replace("#ext#", "AUTO", $text);
         $text=str_replace("#nullable#", $this->nullable == "NO" ? "false" : "true", $text);
 		return $text;
 	}
@@ -266,39 +268,60 @@ class TableProperty
     // inserts Doctrine metadata for field
     function insertFieldMetadata($tablePropertie)
     {
+        $deliminator = '';
         $count = 0;
         $str  =  "\t/**\n";
-        $str .=  "\t * @Column(";
+
+        if($tablePropertie->key)
+        {
+            if($tablePropertie->isPK())
+              $str .= "\t * @Id";
+        }
+
+        $str .=  "\n\t * @Column(";
         foreach ($tablePropertie as $key => $val)
         {
             if(!empty($val))
             {
                if($count > 0 )
-                    $str .= ', ';
+                    $deliminator = ', ';
 
                 // Do Property mapping to doctrine type properties
                 if($key == 'name')
                 {
-                   $str .=  $key.'="'.$tablePropertie->format('#name#').'"';
+                   $str .=  $deliminator.$key.'="'.$tablePropertie->format('#name#').'"';
                 }
                 else if($key == 'nullable')
                 {
-                    $str .=  $key.'="'.$tablePropertie->format('#nullable#').'"';
+                    $str .=  $deliminator.$key.'="'.$tablePropertie->format('#nullable#').'"';
                 }
                 else if($key == 'type')
                 {
-                    $str .=  $key.'="'.$tablePropertie->format('#doctrinePrimitiveType#').'"';
+                    $str .=  $deliminator.$key.'="'.$tablePropertie->format('#doctrinePrimitiveType#').'"';
+                }
+                else if($key == 'ext')
+                {
+                    // inline ignore
+                }
+                else if($key == 'key')
+                {
+                    // inline ignore
                 }
                 else
                 {
-                    $str .=  $key.'="'.$val.'"';
+                    $str .=  $deliminator.$key.'="'.$val.'"';
                 }
 
             }
 
             $count++;
         }
+
         $str .=  ")";
+
+        if($tablePropertie->ext)
+            $str .= "\n\t * @GeneratedValue(strategy='".$tablePropertie->format("#ext#")."')";
+
         $str .=  "\n\t */";
 
         return $str;
