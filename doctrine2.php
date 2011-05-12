@@ -1,5 +1,5 @@
 <?php
-/* vim: set expandtab sw=4 ts=4 sts=4: */
+
 /**
  * Set of functions used to build Doctrine 2 dumps of tables
  *
@@ -265,6 +265,30 @@ class TableProperty
 
 }
 
+
+     /**
+     * Translates a camel case string into a string with underscores
+     */
+     function fromCamelCase($str)
+     {
+        $str[0] = strtolower($str[0]);
+        $func = create_function('$c', 'return "_" . strtolower($c[1]);');
+        return preg_replace_callback('/([A-Z])/', $func, $str);
+     }
+
+    /**
+     * Translates a string with underscores into camel case
+     */
+    function toCamelCase($str, $capFirstChar = false)
+    {
+        $str = strtolower($str);
+        if($capFirstChar) {
+          $str[0] = strtoupper($str[0]);
+        }
+        $func = create_function('$c', 'return strtoupper($c[1]);');
+        return preg_replace_callback('/_([a-z])/', $func, $str);
+    }
+
     // inserts Doctrine metadata for field
     function insertFieldMetadata($tablePropertie)
     {
@@ -348,20 +372,24 @@ class TableProperty
 			$lines[] = "namespace models;";
             $lines[] = "\n/**\n * @Entity\n * @Table(name='".$table."')\n */\n";
 
-			$lines[] = "class ".ucfirst($table).' {';
+			$lines[] = "class ".toCamelCase( $table, true ).' {';
 
 			foreach ($tableProperties as $tablePropertie)
             {
                 $lines[] =  insertFieldMetadata($tablePropertie);
-                $lines[] = $tablePropertie->format("	private $#name#;\n");
 
+                $functname = toCamelCase( $tablePropertie->format('#name#') );
+                $lines[] = "	private $".$functname.";\n";
             }
 
 			$lines[] = "\n";
 			foreach ($tableProperties as $tablePropertie)
             {
-                $lines[] = $tablePropertie->format("	public function get#name#() \n\t{\n\t\treturn \$this->#name#;\n\t} \n");
-                $lines[] = $tablePropertie->format("	public function set#name#($#name#) \n\t{\n\t\t\$this->#name# = \$#name#;\n\t} \n");
+                $varname   = toCamelCase( $tablePropertie->format('#name#') );
+                $functname = toCamelCase( $tablePropertie->format('#name#'), true );
+
+                $lines[] = $tablePropertie->format("	public function get".$functname."() \n\t{\n\t\treturn \$this->".$varname.";\n\t} \n");
+                $lines[] = $tablePropertie->format("	public function set".$functname."($".$varname.") \n\t{\n\t\t\$this->".$varname." = \$".$varname.";\n\t} \n");
             }
 
 			$lines[] = "}\n?>\n\n";
