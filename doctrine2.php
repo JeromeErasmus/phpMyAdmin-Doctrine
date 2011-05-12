@@ -214,21 +214,31 @@ class TableProperty
      */
     function getDoctrineObjectType()
 	{
-        if (strpos($this->type, "varchar") === 0) return "string";
-        if (strpos($this->type, "smallint") === 0) return "smallint";
-        if (strpos($this->type, "bigint") === 0) return "bigint";
-        if (strpos($this->type, "int") === 0) return "integer";
-        if (strpos($this->type, "boolean") === 0) return "boolean";
-        if (strpos($this->type, "decimal") === 0) return "decimal";
-        if (strpos($this->type, "datetime") === 0) return "datetime";
-        if (strpos($this->type, "timestamp") === 0) return "datetime";
-        if (strpos($this->type, "clob") === 0) return "text";
+         $obj = new stdClass;
 
-        if (strpos($this->type, "char") === 0) return "text";
-        if (strpos($this->type, "text") === 0) return "text";
-        if (strpos($this->type, "longtext") === 0) return "text";
+        // extract type
+       if (strpos($this->type, "varchar") === 0) $obj->type = "string";
+        if (strpos($this->type, "smallint") === 0) $obj->type = "smallint";
+        if (strpos($this->type, "bigint") === 0) $obj->type = "bigint";
+        if (strpos($this->type, "int") === 0) $obj->type = "integer";
+        if (strpos($this->type, "boolean") === 0) $obj->type = "boolean";
+        if (strpos($this->type, "decimal") === 0) $obj->type = "decimal";
+        if (strpos($this->type, "datetime") === 0) $obj->type = "datetime";
+        if (strpos($this->type, "timestamp") === 0) $obj->type = "datetime";
+        if (strpos($this->type, "clob") === 0) $obj->type = "text";
 
-		return "Unknown";
+        if (strpos($this->type, "char") === 0) $obj->type = "text";
+        if (strpos($this->type, "text") === 0) $obj->type = "text";
+        if (strpos($this->type, "longtext") === 0) $obj->type = "text";
+
+        //extract value if any
+        $sS = strrpos($this->type, '(');
+        $sE = strrpos($this->type, ')');
+
+        if($sS && $sE)
+            $obj->val = substr($this->type, $sS+1, ($sE-$sS)-1);
+
+		return $obj;
 	}
 
 
@@ -252,7 +262,6 @@ class TableProperty
 		$text=str_replace("#unique#", $this->isUnique(), $text);
 		$text=str_replace("#ucfirstName#", ucfirst($this->name), $text);
 		$text=str_replace("#phpPrimitiveType#", $this->getPHPPrimitiveType(), $text);
-		$text=str_replace("#doctrinePrimitiveType#", $this->getDoctrineObjectType(), $text);
         $text=str_replace("#phpObjectType#", $this->getPHPObjectType(), $text);
 		$text=str_replace("#indexName#", $this->getIndexName(), $text);
 
@@ -315,14 +324,25 @@ class TableProperty
                 {
                    $str .=  $deliminator.$key.'="'.$tablePropertie->format('#name#').'"';
                 }
-                else if($key == 'nullable')
-                {
-                    $str .=  $deliminator.$key.'="'.$tablePropertie->format('#nullable#').'"';
-                }
                 else if($key == 'type')
                 {
-                    $str .=  $deliminator.$key.'="'.$tablePropertie->format('#doctrinePrimitiveType#').'"';
+                    $typeObj = $tablePropertie->getDoctrineObjectType();
+
+                    // display type
+                    $str .=  $deliminator.$key.'="'.$typeObj->type.'"';
+
+                    // display type value
+                    if($typeObj->val)
+                        $str .=  $deliminator.'length='.$typeObj->val;
                 }
+                else if($key == 'nullable')
+                {
+                    $str .=  $deliminator.$key.'='.$tablePropertie->format('#nullable#');
+                }
+              /*  else if($key == 'unique')
+                {
+                    $str .=  $deliminator.$key.'='.$tablePropertie->format('#unique#');
+                }  */
                 else if($key == 'ext')
                 {
                     // inline ignore
@@ -344,7 +364,7 @@ class TableProperty
         $str .=  ")";
 
         if($tablePropertie->ext)
-            $str .= "\n\t * @GeneratedValue(strategy='".$tablePropertie->format("#ext#")."')";
+            $str .= "\n\t * @GeneratedValue(strategy=\"".$tablePropertie->format("#ext#")."\")";
 
         $str .=  "\n\t */";
 
@@ -367,10 +387,10 @@ class TableProperty
             {
                $tableProperties[] = new TableProperty($row);
             }
-           // $lines[] = print_r($tableProperties);
+
             $lines[] = "<?php\n";
 			$lines[] = "namespace models;";
-            $lines[] = "\n/**\n * @Entity\n * @Table(name='".$table."')\n */\n";
+            $lines[] = "\n/**\n * @Entity\n * @Table(name=\"".$table."\")\n */\n";
 
 			$lines[] = "class ".toCamelCase( $table, true ).' {';
 
