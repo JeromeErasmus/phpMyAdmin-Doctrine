@@ -207,6 +207,32 @@ class TableProperty
 		if (strpos($this->type, "datetime") === 0) return "DateTime";
 		return "Unknown";
 	}
+
+    /*
+     *
+     * Doctrine Object Type Conversion
+     */
+    function getDoctrineObjectType()
+	{
+        if (strpos($this->type, "varchar") === 0) return "string";
+        if (strpos($this->type, "smallint") === 0) return "smallint";
+        if (strpos($this->type, "bigint") === 0) return "bigint";
+        if (strpos($this->type, "int") === 0) return "integer";
+        if (strpos($this->type, "boolean") === 0) return "boolean";
+        if (strpos($this->type, "decimal") === 0) return "decimal";
+        if (strpos($this->type, "datetime") === 0) return "datetime";
+        if (strpos($this->type, "timestamp") === 0) return "datetime";
+        if (strpos($this->type, "clob") === 0) return "text";
+
+        if (strpos($this->type, "char") === 0) return "text";
+        if (strpos($this->type, "text") === 0) return "text";
+        if (strpos($this->type, "longtext") === 0) return "text";
+
+		return "Unknown";
+	}
+
+
+
 	function getIndexName()
 	{
 		if (strlen($this->key)>0)
@@ -226,10 +252,15 @@ class TableProperty
 		$text=str_replace("#unique#", $this->isUnique(), $text);
 		$text=str_replace("#ucfirstName#", ucfirst($this->name), $text);
 		$text=str_replace("#phpPrimitiveType#", $this->getPHPPrimitiveType(), $text);
-		$text=str_replace("#phpObjectType#", $this->getPHPObjectType(), $text);
+		$text=str_replace("#doctrinePrimitiveType#", $this->getDoctrineObjectType(), $text);
+        $text=str_replace("#phpObjectType#", $this->getPHPObjectType(), $text);
 		$text=str_replace("#indexName#", $this->getIndexName(), $text);
+
+        $text=str_replace("#nullable#", $this->nullable == "NO" ? "false" : "true", $text);
 		return $text;
 	}
+
+
 }
 
     // inserts Doctrine metadata for field
@@ -243,9 +274,26 @@ class TableProperty
             if(!empty($val))
             {
                if($count > 0 )
-                    $str .= ',';
+                    $str .= ', ';
 
-               $str .=  $key.'="'.$val.'"';
+                // Do Property mapping to doctrine type properties
+                if($key == 'name')
+                {
+                   $str .=  $key.'="'.$tablePropertie->format('#name#').'"';
+                }
+                else if($key == 'nullable')
+                {
+                    $str .=  $key.'="'.$tablePropertie->format('#nullable#').'"';
+                }
+                else if($key == 'type')
+                {
+                    $str .=  $key.'="'.$tablePropertie->format('#doctrinePrimitiveType#').'"';
+                }
+                else
+                {
+                    $str .=  $key.'="'.$val.'"';
+                }
+
             }
 
             $count++;
@@ -277,20 +325,20 @@ class TableProperty
 			$lines[] = "namespace models;";
             $lines[] = "\n/**\n * @Entity\n * @Table(name='".$table."')\n */\n";
 
-			$lines[] = "public class ".ucfirst($table);
-			$lines[] = "{";
+			$lines[] = "class ".ucfirst($table).' {';
 
 			foreach ($tableProperties as $tablePropertie)
             {
                 $lines[] =  insertFieldMetadata($tablePropertie);
                 $lines[] = $tablePropertie->format("	private $#name#;\n");
+
             }
 
 			$lines[] = "\n";
 			foreach ($tableProperties as $tablePropertie)
             {
-                $lines[] = $tablePropertie->format("	public function get #name#() \n\t{\n\t\treturn \$this->#name#;\n\t} \n");
-                $lines[] = $tablePropertie->format("	public function set #name#($#name#) \n\t{\n\t\t\$this->#name# = \$#name#;\n\t} \n");
+                $lines[] = $tablePropertie->format("	public function get#name#() \n\t{\n\t\treturn \$this->#name#;\n\t} \n");
+                $lines[] = $tablePropertie->format("	public function set#name#($#name#) \n\t{\n\t\t\$this->#name# = \$#name#;\n\t} \n");
             }
 
 			$lines[] = "}\n?>\n\n";
