@@ -32,8 +32,8 @@ $CG_HANDLERS = array(D2_HANDLER_PHP_BODY, D2_HANDLER_XML_BODY);
 if (isset($plugin_list)) {
     $plugin_list['doctrine2'] = array(
         'text' => 'Doctrine 2',
-        'extension' => 'cs',
-        'mime_type' => 'text/cs',
+        'extension' => '.php.txt',
+        'mime_type' => 'text/php',
           'options' => array(
           	array('type' => 'hidden', 'name' => 'data'),
             array('type' => 'select', 'name' => 'format', 'text' => 'strFormat', 'values' => $CG_FORMATS),
