@@ -270,12 +270,12 @@ class TableProperty
     {
         $deliminator = '';
         $count = 0;
-        $str  =  "\t/**\n";
+        $str  =  "\t/**";
 
         if($tablePropertie->key)
         {
             if($tablePropertie->isPK())
-              $str .= "\t * @Id";
+              $str .= "\n\t * @Id";
         }
 
         $str .=  "\n\t * @Column(";
