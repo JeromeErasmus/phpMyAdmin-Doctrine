@@ -1,9 +1,9 @@
 
 
-phpMyAdmin Doctrine 2 - Readme
+phpMyAdmin Doctrine - Readme
 ==============================
 
-  Set of functions used to build Doctrine 2 dumps of tables
+  Set of functions used to build Doctrine 1.2 YAML and Doctrine 2 Model Class dumps of tables
 
   Version 0.1
   ---------------
@@ -27,7 +27,7 @@ phpMyAdmin Doctrine 2 - Readme
 
   Installation:
     1) Place the doctrine2.php in phpMyAdmin's '/libraries/export' folder.
-    2) go to phpMyAdmin's export tab and see "Doctrine 2" is avaliable under the list of export options.
+    2) go to phpMyAdmin's export tab and see "Doctrine 1.2" and "Doctrine 2" is avaliable under the list of export options.
 
 
 
