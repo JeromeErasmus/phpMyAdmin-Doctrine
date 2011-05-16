@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Set of functions used to build Doctrine 2 dumps of tables
+ * Set of functions used to build Doctrine 1.2 YAML dumps of tables
  *
- * @package phpMyAdmin-Export-Doctrine2 PHP
+ * @package phpMyAdmin-Export-Doctrine1 PHP
  *
  * @author jerome Erasmus 2011 www.developermill.com
  */
@@ -93,7 +93,7 @@ function PMA_exportFooter()
  */
 function PMA_exportHeader()
 {
-    $str = "options:\n  type: INNODB\n\n";
+    $str = "";
     return PMA_exportOutputHandler($str);
 }
 
@@ -216,7 +216,7 @@ function createYAML_dataTypeSchema()
      $type['longblob'] = 'blob';
      $type['tinyblob'] = 'blob';
      $type['blob'] = 'blob';
-     $type['mediuumblob'] = 'blob';
+     $type['mediumblob'] = 'blob';
      $type['longtext'] = 'clob';
      $type['tinytext'] = 'clob';
      $type['text'] = 'clob';
@@ -372,7 +372,7 @@ class TableProperty
         // build header
         if(!$useVerboseSyntax)
         {
-            $lines[] = "detect_relations: true\n";
+         //   $lines[] = "detect_relations: true\n";
         }
 
         // build body
@@ -395,6 +395,9 @@ class TableProperty
 
             // insert table name
             $lines[] = "  tableName: ".$table;
+
+            //insert columns
+            $lines[] = "  options:\n  type: INNODB\n";
 
             // insert columns
             $lines[] = "  columns:";
