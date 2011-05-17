@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Set of functions used to build Doctrine 2 dumps of tables
+ * Set of functions used to build Doctrine 1.2 YAML dumps of tables
  *
- * @package phpMyAdmin-Export-Doctrine2 PHP
+ * @package phpMyAdmin-Export-Doctrine1 PHP
  *
  * @author jerome Erasmus 2011 www.developermill.com
  */
@@ -15,32 +15,36 @@ if (! defined('PHPMYADMIN')) {
 /**
  * This gets executed twice so avoid a notice
  */
+
 if (! defined('D2_FORMAT_PHP')) {
-    define("D2_FORMAT_PHP", "Doctrine 2 PHP");
-    define("D2_FORMAT_XML", "Doctrine 2 XML");
+    define("D2_FORMAT_PHP", "Doctrine 2.0 PHP");
+    define("D2_FORMAT_XML", "Doctrine 2.0 XML");
 
     define("D2_HANDLER_PHP_BODY", "handleDoctrine2PHPBody");
     define("D2_HANDLER_XML_BODY", "handleDoctrine2XMLBody");
 }
 
-$CG_FORMATS = array(D2_FORMAT_PHP, D2_FORMAT_XML);
-$CG_HANDLERS = array(D2_HANDLER_PHP_BODY, D2_HANDLER_XML_BODY);
+$PARSE_FORMATS = array(D2_FORMAT_PHP, D2_FORMAT_XML);
+$PARSE_HANDLERS = array(D2_HANDLER_PHP_BODY, D2_HANDLER_XML_BODY);
+
+$YAML_dataTypes;
 
 /**
  * Export Options
  */
 if (isset($plugin_list)) {
     $plugin_list['doctrine2'] = array(
-        'text' => 'Doctrine 2',
+        'text' => 'Doctrine 2.0',
         'extension' => '.php.txt',
         'mime_type' => 'text/php',
           'options' => array(
           	array('type' => 'hidden', 'name' => 'data'),
-            array('type' => 'select', 'name' => 'format', 'text' => 'strFormat', 'values' => $CG_FORMATS),
+            array('type' => 'select', 'name' => 'format', 'text' => 'strFormat', 'values' => $PARSE_FORMATS),
             ),
         'options_text' => 'strOptions',
         );
 } else {
+
 
 /**
  * Set of functions used to build exports of tables
@@ -76,10 +80,25 @@ function PMA_exportFooter()
  * @return  bool        Whether it suceeded
  *
  * @access  public
+ *
+    abstract 	Whether or not to make the generated class abstract. Defaults to false. When a class is abstract it is not exported to the database.
+    className 	Name of the class to generate
+    tableName 	Name of the table in your DBMS to use.
+    connection 	Name of the Doctrine_Connection instance to bind the model to.
+    columns 	Column definitions.
+    relations 	Relationship definitions.
+    indexes 	Index definitions.
+    attributes 	Attribute definitions.
+    actAs 	ActAs definitions.
+    options 	Option definitions.
+    inheritance 	Array for inheritance definition
+    listeners 	Array defining listeners to attach
+    checks 	Checks to run at application level as well as exporting to your DBMS
  */
 function PMA_exportHeader()
 {
-    return TRUE;
+    $str = "";
+    return PMA_exportOutputHandler($str);
 }
 
 /**
@@ -139,277 +158,319 @@ function PMA_exportDBCreate($db)
  */
 function PMA_exportData($db, $table, $crlf, $error_url, $sql_query)
 {
-	global $CG_FORMATS, $CG_HANDLERS;
+	global $PARSE_FORMATS, $PARSE_HANDLERS;
 	$format = cgGetOption("format");
-	$index = array_search($format, $CG_FORMATS);
+	$index = array_search($format, $PARSE_FORMATS);
 	if ($index >= 0)
-		return PMA_exportOutputHandler($CG_HANDLERS[$index]($db, $table, $crlf));
+    {
+        $str = '';
+        $str .= PMA_exportOutputHandler($PARSE_HANDLERS[$index]($db, $table, $crlf));
+    }
+		return $str;
 	return PMA_exportOutputHandler(sprintf("%s is not supported.", $format));
+}
+
+
+
+
+
+/*
+ *  ---- YAML COLUMN SCHEMA ----
+    name 	Name of the column.
+    fixed 	Whether or not the column is fixed.
+    columnKey 	Whether or not the column is a part of the primary / Unique etc..key.
+    autoincrement 	Whether or not the column is an autoincrement column.
+    type 	Doctrine data type of the column
+    length 	Length of the column
+    default 	Default value of the column
+    scale 	Scale of the column. Used for the decimal type.
+    values 	List of values for the enum type.
+    comment 	Comment for the column.
+    sequence 	Sequence definition for column.
+    zerofill 	Whether or not to make the column fill empty characters with zeros
+    extra 	Array of extra information to store with the column definition
+    unsigned 	Unsigned modifiers for some field definitions, although not all DBMS's support this modifier for integer field types.
+    nullable
+ */
+
+
+/*
+ *  ---- YAML DataType SCHEMA ----
+ *  Below creates the available column types that can is used for the YAML data Type conversion
+ *  as well as the type it is translated to when using the MySQL
+ *
+ */
+
+function createYAML_dataTypeSchema()
+{
+     $type = array();
+     $type['integer'] = 'integer';
+     $type['tinyint'] = 'integer';
+     $type['smallint'] = 'integer';
+     $type['mediumint'] = 'integer';
+     $type['int'] = 'integer';
+     $type['bigint'] = 'integer';
+     $type['double'] = 'float';  // ? correct schema?
+//   $type['double'] = 'double'; // ? correct schema?
+     $type['decimal'] = 'decimal';
+     $type['char'] = 'char';
+//   $type['varchar'] = 'varchar'; // ? correct schema?
+     $type['varchar'] = 'string';  // ? correct schema?
+     $type['text'] = 'array';    // ? correct schema?
+//   $type['text'] = 'object';   // ? correct schema?
+     $type['longblob'] = 'blob';
+     $type['tinyblob'] = 'blob';
+     $type['blob'] = 'blob';
+     $type['mediumblob'] = 'blob';
+     $type['longtext'] = 'clob';
+     $type['tinytext'] = 'clob';
+     $type['text'] = 'clob';
+     $type['mediumtext'] = 'clob';
+     $type['datetime'] = 'timestamp';
+     $type['time'] = 'time';
+     $type['date'] = 'date';
+//   $type['text'] = 'gzip';  // ? correct schema?
+//   $type['tinyint(1)'] = 'boolean';  // ? correct schema?
+     $type['bit'] = 'bit';
+     //varbit ?
+     //inet ?
+     //enum ?
+
+    return $type;
 }
 
 /**
  *
- * @package phpMyAdmin-Export-Codegen
+ * @package phpMyAdmin-Export-Doctrine
  */
 class TableProperty
 {
-	public $name;
-	public $type;
-	public $nullable;
-	public $key;
-	public $defaultValue;
-	public $ext;
-	function __construct($row)
+    public $fields;
+
+	function __construct($rowObj)
 	{
-		$this->name = trim($row[0]);
-		$this->type = trim($row[1]);
-		$this->nullable = trim($row[2]);
-		$this->key = trim($row[3]);
-		$this->defaultValue = trim($row[4]);
-		$this->ext = trim($row[5]);
-	}
-	function getPureType()
-	{
-		$pos=strpos($this->type, "(");
-		if ($pos > 0)
-			return substr($this->type, 0, $pos);
-		return $this->type;
-	}
-	function isNotNull()
-	{
-		return $this->nullable == "NO" ? "true" : "false";
-	}
-	function isUnique()
-	{
-		return $this->key == "PRI" || $this->key == "UNI" ? "true" : "false";
-	}
-	function getPHPPrimitiveType()
-	{
-		if (strpos($this->type, "int") === 0) return "int";
-		if (strpos($this->type, "long") === 0) return "long";
-		if (strpos($this->type, "char") === 0) return "string";
-		if (strpos($this->type, "varchar") === 0) return "string";
-		if (strpos($this->type, "text") === 0) return "string";
-		if (strpos($this->type, "longtext") === 0) return "string";
-		if (strpos($this->type, "tinyint") === 0) return "bool";
-		if (strpos($this->type, "datetime") === 0) return "DateTime";
-		return "unknown";
-	}
-	function getPHPObjectType()
-	{
-		if (strpos($this->type, "int") === 0) return "Int32";
-		if (strpos($this->type, "long") === 0) return "Long";
-		if (strpos($this->type, "char") === 0) return "String";
-		if (strpos($this->type, "varchar") === 0) return "String";
-		if (strpos($this->type, "text") === 0) return "String";
-		if (strpos($this->type, "longtext") === 0) return "String";
-		if (strpos($this->type, "tinyint") === 0) return "Boolean";
-		if (strpos($this->type, "datetime") === 0) return "DateTime";
-		return "Unknown";
+
+        $this->fields = new stdClass();
+
+        $this->fields->name = $this->mapEntity('COLUMN_NAME', 'name', $rowObj, false);
+        $this->fields->fixed = $this->mapEntity('', 'fixed', $rowObj, false);
+        $this->fields->autoincrement = $this->mapEntity('EXTRA', 'autoincrement', $rowObj);
+        $this->fields->type = $this->mapEntity('DATA_TYPE', 'type', $rowObj);
+        $this->fields->length = $this->mapEntity('COLUMN_TYPE', 'length', $rowObj);
+        $this->fields->default = $this->mapEntity('COLUMN_DEFAULT', 'default', $rowObj);
+        $this->fields->scale = $this->mapEntity('NUMERIC_SCALE', 'scale', $rowObj, false);
+        $this->fields->precision = $this->mapEntity('NUMERIC_PRECISION', 'precision', $rowObj, false);
+        $this->fields->columnKey = $this->mapEntity('COLUMN_KEY', 'columnKey', $rowObj);
+        $this->fields->values =  $this->mapEntity('', 'enum', $rowObj, false);     // ??? needs identification
+        $this->fields->comment = $this->mapEntity('COLUMN_COMMENT', 'comment', $rowObj);
+        $this->fields->sequence = $this->mapEntity('', 'sequence', $rowObj, false);  // ??? needs identification
+        $this->fields->zerofill = $this->mapEntity('', 'zerofill', $rowObj, false);  // ??? needs identification
+        $this->fields->extra = $this->mapEntity('EXTRA', 'extra', $rowObj);
+        $this->fields->unsigned = $this->mapEntity('', 'unsigned', $rowObj, false); // ??? needs identification
+        $this->fields->nullable = $this->mapEntity('IS_NULLABLE', 'nullable', $rowObj);
+
+
+        if($this->fields->type->schemaVal == "decimal")
+        {
+             $this->fields->scale->include = true;
+             $this->fields->precision->include = true;
+             $this->fields->length->include = false;
+        }
 	}
 
-    /*
-     *
-     * Doctrine Object Type Conversion
-     */
-    function getDoctrineObjectType()
+    function mapEntity($columnName, $columnSchemaName, $entityObj, $include=true)
+    {
+        global $YAML_dataTypes;
+
+        $prop = new stdClass();
+
+        $prop->schemaName = $columnSchemaName;
+        $prop->include = $include;
+
+        switch($columnSchemaName)
+        {
+             case "type":
+                $prop->schemaVal = $YAML_dataTypes[$entityObj[$columnName]];
+                break;
+
+             case "length":
+                $prop->schemaVal = $this->getPureLength($entityObj[$columnName]);
+                break;
+
+             case "autoincrement":
+                $prop->schemaVal =  $entityObj[$columnName] == "auto_increment" ? "true" : "";
+                $prop->include = false;
+                break;
+
+             case "columnKey":
+                if($entityObj[$columnName] == "PRI")
+                {
+                    $prop->schemaName = 'primary';
+                    $prop->schemaVal =  "true";
+                    $prop->include = false;
+                } else if($entityObj[$columnName] == "UNI")  {
+                    $prop->schemaName = 'unique';
+                    $prop->schemaVal =  "true";
+                    $prop->include = true;
+                }  else if($entityObj[$columnName] == "MUL") {
+                    $prop->include = false;
+                }
+
+                break;
+
+
+             case "nullable":
+                $prop->schemaVal =  $entityObj[$columnName] == "YES" ? "true" : "false";
+                break;
+
+             case "extra":
+                if($entityObj[$columnName] == "auto_increment")
+                    $prop->include = false;
+                break;
+
+             default:
+                $prop->schemaVal = $entityObj[$columnName];
+                break;
+        }
+
+
+        return $prop;
+    }
+
+
+
+    function getPureLength($string)
 	{
-         $obj = new stdClass;
-
-        // extract type
-        if (strpos($this->type, "varchar") === 0) $obj->type = "string";
-        if (strpos($this->type, "smallint") === 0) $obj->type = "smallint";
-        if (strpos($this->type, "bigint") === 0) $obj->type = "bigint";
-        if (strpos($this->type, "int") === 0) $obj->type = "integer";
-        if (strpos($this->type, "boolean") === 0) $obj->type = "boolean";
-        if (strpos($this->type, "decimal") === 0) $obj->type = "decimal";
-        if (strpos($this->type, "datetime") === 0) $obj->type = "datetime";
-        if (strpos($this->type, "timestamp") === 0) $obj->type = "datetime";
-        if (strpos($this->type, "clob") === 0) $obj->type = "text";
-
-        if (strpos($this->type, "char") === 0) $obj->type = "text";
-        if (strpos($this->type, "text") === 0) $obj->type = "text";
-        if (strpos($this->type, "longtext") === 0) $obj->type = "text";
-
-        //extract value if any
-        $sS = strrpos($this->type, '(');
-        $sE = strrpos($this->type, ')');
+		$sS = strrpos($string , '(');
+        $sE = strrpos($string , ')');
 
         if($sS && $sE)
-            $obj->val = substr($this->type, $sS+1, ($sE-$sS)-1);
+            return substr($string , $sS+1, ($sE-$sS)-1);
 
-		return $obj;
+		return '';
 	}
 
 
+    /*
+     * INSERT COLUMN
+     *
+     * @param   boolean      use verbose syntax
+     */
+    function insertMetadata($useVerboseSyntax=true)
+    {
 
-	function getIndexName()
-	{
-		if (strlen($this->key)>0)
-			return "index=\"" . $this->name . "\"";
-		return "";
-	}
-	function isPK()
-	{
-		return $this->key=="PRI";
-	}
-	function format($pattern)
-	{
-		$text=$pattern;
-		$text=str_replace("#name#", $this->name, $text);
-		$text=str_replace("#type#", $this->getPureType(), $text);
-		$text=str_replace("#notNull#", $this->isNotNull(), $text);
-		$text=str_replace("#unique#", $this->isUnique(), $text);
-		$text=str_replace("#ucfirstName#", ucfirst($this->name), $text);
-		$text=str_replace("#phpPrimitiveType#", $this->getPHPPrimitiveType(), $text);
-        $text=str_replace("#phpObjectType#", $this->getPHPObjectType(), $text);
-		$text=str_replace("#indexName#", $this->getIndexName(), $text);
+        $deliminator = '';
+        $count = 0;
+        $lines = array();
 
-        $text=str_replace("#key#", "AUTO", $text);
-        $text=str_replace("#ext#", "AUTO", $text);
-        $text=str_replace("#nullable#", $this->nullable == "NO" ? "false" : "true", $text);
-		return $text;
-	}
+        $lines[] =  "\t/**";
 
+        if($this->fields->columnKey->schemaName == "primary")
+              $lines[] = "\t * @Id";
+
+        $str = "\t * @Column(";
+        $str .= "name=\"".$this->fields->name->schemaVal."\"";
+
+        foreach($this->fields as $field => $val)
+        {
+            if(!empty($val->schemaVal) && $val->include == true)
+            {
+                if($count > 0 )
+                    $deliminator = ', ';
+
+                // append verbose length to type field e.g. varchar(255)
+                switch($val->schemaName)
+                {
+                    case "type":
+                        $str .= $deliminator.$val->schemaName."="."\"$val->schemaVal\"";
+                        break;
+
+                    default:
+                        $str .= $deliminator.$val->schemaName."=".$val->schemaVal;
+                        break;
+                }
+            }
+            $count++;
+        }
+        $str .=  ")";
+        $lines[] = $str;
+
+        if($this->fields->autoincrement->schemaVal)
+              $lines[] = "\t * @GeneratedValue(strategy=\"AUTO\")";
+
+        $lines[] =  "\t */";
+        return implode("\n", $lines);
+    }
 
 }
 
-
-     /**
-     * Translates a camel case string into a string with underscores
+    /*
+     * ============================================================================
      */
-     function fromCamelCase($str)
-     {
-        $str[0] = strtolower($str[0]);
-        $func = create_function('$c', 'return "_" . strtolower($c[1]);');
-        return preg_replace_callback('/([A-Z])/', $func, $str);
-     }
-
-    /**
-     * Translates a string with underscores into camel case
-     */
-    function toCamelCase($str, $capFirstChar = false)
-    {
-        $str = strtolower($str);
-        if($capFirstChar) {
-          $str[0] = strtoupper($str[0]);
-        }
-        $func = create_function('$c', 'return strtoupper($c[1]);');
-        return preg_replace_callback('/_([a-z])/', $func, $str);
-    }
-
-    // inserts Doctrine metadata for field
-    function insertFieldMetadata($tablePropertie)
-    {
-        $deliminator = '';
-        $count = 0;
-        $str  =  "\t/**";
-
-        if($tablePropertie->key)
-        {
-            if($tablePropertie->isPK())
-              $str .= "\n\t * @Id";
-        }
-
-        $str .=  "\n\t * @Column(";
-        foreach ($tablePropertie as $key => $val)
-        {
-            if(!empty($val))
-            {
-               if($count > 0 )
-                    $deliminator = ', ';
-
-                // Do Property mapping to doctrine type properties
-                if($key == 'name')
-                {
-                   $str .=  $deliminator.$key.'="'.$tablePropertie->format('#name#').'"';
-                }
-                else if($key == 'type')
-                {
-                    $typeObj = $tablePropertie->getDoctrineObjectType();
-
-                    // display type
-                    $str .=  $deliminator.$key.'="'.$typeObj->type.'"';
-
-                    // display type value
-                    if($typeObj->val)
-                        $str .=  $deliminator.'length='.$typeObj->val;
-                }
-                else if($key == 'nullable')
-                {
-                    $str .=  $deliminator.$key.'='.$tablePropertie->format('#nullable#');
-                }
-              /*  else if($key == 'unique')
-                {
-                    $str .=  $deliminator.$key.'='.$tablePropertie->format('#unique#');
-                }  */
-                else if($key == 'ext')
-                {
-                    // inline ignore
-                }
-                else if($key == 'key')
-                {
-                    // inline ignore
-                }
-                else
-                {
-                    $str .=  $deliminator.$key.'="'.$val.'"';
-                }
-
-            }
-
-            $count++;
-        }
-
-        $str .=  ")";
-
-        if($tablePropertie->ext)
-            $str .= "\n\t * @GeneratedValue(strategy=\"".$tablePropertie->format("#ext#")."\")";
-
-        $str .=  "\n\t */";
-
-        return $str;
-    }
-
-
-
 	function handleDoctrine2PHPBody($db, $table, $crlf)
 	{
-        $lines=array();
-		$result=PMA_DBI_query(sprintf("DESC %s.%s", PMA_backquote($db), PMA_backquote($table)));
+        global $YAML_dataTypes;
 
-       //  $sql = sprintf("DESC %s.%s", PMA_backquote($db), PMA_backquote($table);
+        $lines=array();
+
+        /*
+         * Doctrine offers the ability to specify schema in an abbreviated syntax.
+         *
+         * If verbose is set to false, a lot of the schema parameters have values they default to,
+         * this allows us to abbreviate the syntax and let Doctrine just use its defaults.
+         *
+         * If verbose is set to true ALL schema parameters will be included. This is recomended!
+         */
+        $useVerboseSyntax = true;
+
+        // create schema
+        $YAML_dataTypes = createYAML_dataTypeSchema();
+
+        // build header
+        if(!$useVerboseSyntax)
+        {
+         //   $lines[] = "detect_relations: true\n";
+        }
+
+        // build body
+
+        $sqlQuery = "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '$table'";
+		$result=PMA_DBI_query($sqlQuery);
 
         if ($result)
 		{
 			$tableProperties=array();
-			while ($row = PMA_DBI_fetch_row($result))
+			while ($row = PMA_DBI_fetch_assoc($result))
             {
                $tableProperties[] = new TableProperty($row);
             }
 
+             // insert table Class Headers
             $lines[] = "<?php\n";
 			$lines[] = "namespace models;";
             $lines[] = "\n/**\n * @Entity\n * @Table(name=\"".$table."\")\n */\n";
 
+            // insert class name
 			$lines[] = "class ".toCamelCase( $table, true )." {\n\n\n";
+
 
 			foreach ($tableProperties as $tablePropertie)
             {
-                $lines[] =  insertFieldMetadata($tablePropertie);
+                 //insert metadata
+                 $lines[] = "    ".$tablePropertie->insertMetadata($useVerboseSyntax);
 
-                $functname = toCamelCase( $tablePropertie->format('#name#') );
-                $lines[] = "	private $".$functname.";\n";
+                 //insert property
+                $propName = toCamelCase( $tablePropertie->fields->name->schemaVal );
+                $lines[] = "	private $".$propName.";\n";
             }
 
 			$lines[] = "\n";
 			foreach ($tableProperties as $tablePropertie)
             {
-                $varname   = toCamelCase( $tablePropertie->format('#name#') );
-                $functname = toCamelCase( $tablePropertie->format('#name#'), true );
+                $functname = toCamelCase( $tablePropertie->fields->name->schemaVal, true );
 
-                $lines[] = $tablePropertie->format("	public function get".$functname."() \n\t{\n\t\treturn \$this->".$varname.";\n\t} \n");
-                $lines[] = $tablePropertie->format("	public function set".$functname."($".$varname.") \n\t{\n\t\t\$this->".$varname." = \$".$varname.";\n\t} \n");
+                $lines[] = "	public function get".$functname."() \n\t{\n\t\treturn \$this->".$propName.";\n\t} \n";
+                $lines[] = "	public function set".$functname."($".$propName.") \n\t{\n\t\t\$this->".$propName." = \$".$propName.";\n\t} \n";
             }
 
 			$lines[] = "}\n?>\n\n";
@@ -417,14 +478,42 @@ class TableProperty
 
 			PMA_DBI_free_result($result);
 		}
+
+
 		return implode("\n", $lines);
 
 	}
 
-	function handleDoctrine2XMLBody($db, $table, $crlf)
+    function handleDoctrine2XMLBody($db, $table, $crlf)
 	{
 
 	}
+
+    /**
+    * Translates a camel case string into a string with underscores
+    */
+    function fromCamelCase($str)
+    {
+       $str[0] = strtolower($str[0]);
+       $func = create_function('$c', 'return "_" . strtolower($c[1]);');
+       return preg_replace_callback('/([A-Z])/', $func, $str);
+    }
+
+   /**
+    * Translates a string with underscores into camel case
+    */
+   function toCamelCase($str, $capFirstChar = false)
+   {
+       $str = strtolower($str);
+       if($capFirstChar) {
+         $str[0] = strtoupper($str[0]);
+       }
+       $func = create_function('$c', 'return strtoupper($c[1]);');
+       return preg_replace_callback('/_([a-z])/', $func, $str);
+   }
+
+
+
 
 	function cgGetOption($optionName)
 	{
