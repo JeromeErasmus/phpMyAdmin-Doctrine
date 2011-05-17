@@ -252,7 +252,7 @@ class TableProperty
         $this->fields->primary = $this->mapEntity('COLUMN_KEY', 'primary', $rowObj);
         $this->fields->autoincrement = $this->mapEntity('EXTRA', 'autoincrement', $rowObj);
         $this->fields->type = $this->mapEntity('DATA_TYPE', 'type', $rowObj);
-        $this->fields->length = $this->mapEntity('CHARACTER_MAXIMUM_LENGTH', 'length', $rowObj, false);
+        $this->fields->length = $this->mapEntity('COLUMN_TYPE', 'length', $rowObj, false);
         $this->fields->default = $this->mapEntity('COLUMN_DEFAULT', 'default', $rowObj);
         $this->fields->scale = $this->mapEntity('NUMERIC_SCALE', 'scale', $rowObj);
         $this->fields->values =  $this->mapEntity('', 'enum', $rowObj, false);     // ??? needs identification
@@ -261,6 +261,7 @@ class TableProperty
         $this->fields->zerofill = $this->mapEntity('', 'zerofill', $rowObj, false);  // ??? needs identification
         $this->fields->extra = $this->mapEntity('EXTRA', 'extra', $rowObj);
         $this->fields->unsigned = $this->mapEntity('', 'unsigned', $rowObj, false); // ??? needs identification
+        $this->fields->nullable = $this->mapEntity('IS_NULLABLE', 'nullable', $rowObj);
 	}
 
     function mapEntity($columnName, $columnSchemaName, $entityObj, $include=true)
@@ -278,12 +279,20 @@ class TableProperty
                 $prop->schemaVal = $YAML_dataTypes[$entityObj[$columnName]];
                 break;
 
+             case "length":
+                $prop->schemaVal = $this->getPureLength($entityObj[$columnName]);
+                break;
+
              case "autoincrement":
                 $prop->schemaVal =  $entityObj[$columnName] == "auto_increment" ? "true" : "";
                 break;
 
              case "primary":
                 $prop->schemaVal =  $entityObj[$columnName] == "PRI" ? "true" : "";
+                break;
+
+             case "nullable":
+                $prop->schemaVal =  $entityObj[$columnName] == "YES" ? "true" : "false";
                 break;
 
              case "extra":
@@ -302,13 +311,13 @@ class TableProperty
 
 
 
-    function getPureLength()
+    function getPureLength($string)
 	{
-		$sS = strrpos($this->fields->type->schemaName , '(');
-        $sE = strrpos($this->fields->type->schemaName , ')');
+		$sS = strrpos($string , '(');
+        $sE = strrpos($string , ')');
 
         if($sS && $sE)
-            return substr($this->fields->type->schemaName , $sS+1, ($sE-$sS)-1);
+            return substr($string , $sS+1, ($sE-$sS)-1);
 
 		return '';
 	}
@@ -333,10 +342,8 @@ class TableProperty
                 // append verbose length to type field e.g. varchar(255)
                 if($useVerboseSyntax && $val->schemaName == 'type')
                 {
-                   $len = $this->getPureLength();
-
-                   if(!empty($len))
-                       $str .=  '('.$len.')';
+                   if(!empty($this->fields->length->schemaVal))
+                       $str .=  '('.$this->fields->length->schemaVal.')';
                 }
 
                 $lines[] = $str;
@@ -386,7 +393,7 @@ class TableProperty
 			$tableProperties=array();
 			while ($rowObj = PMA_DBI_fetch_assoc($result))
             {
-               $tableProperties[] = new TableProperty($rowObj);
+               $tableProperties[] = new TableProperty($rowObj);// $lines[] = print_r($rowObj);
             }
 
             // insert table Class name
