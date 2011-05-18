@@ -40,6 +40,7 @@ if (isset($plugin_list)) {
           'options' => array(
           	array('type' => 'hidden', 'name' => 'data'),
             array('type' => 'select', 'name' => 'format', 'text' => 'strFormat', 'values' => $PARSE_FORMATS),
+            array('type' => 'bool', 'name' => 'strPutIndexes', 'text' => 'Include Indexes', 'values' => 'selected'),
             ),
         'options_text' => 'strOptions',
         );
@@ -262,7 +263,7 @@ class TableProperty
         $this->fields->precision = $this->mapEntity('NUMERIC_PRECISION', 'precision', $rowObj, false);
         $this->fields->columnKey = $this->mapEntity('COLUMN_KEY', 'columnKey', $rowObj);
         $this->fields->values =  $this->mapEntity('', 'enum', $rowObj, false);     // ??? needs identification
-        $this->fields->comment = $this->mapEntity('COLUMN_COMMENT', 'comment', $rowObj);
+        $this->fields->comment = $this->mapEntity('COLUMN_COMMENT', 'comment', $rowObj, false);
         $this->fields->sequence = $this->mapEntity('', 'sequence', $rowObj, false);  // ??? needs identification
         $this->fields->zerofill = $this->mapEntity('', 'zerofill', $rowObj, false);  // ??? needs identification
         $this->fields->extra = $this->mapEntity('EXTRA', 'extra', $rowObj);
@@ -423,8 +424,29 @@ class TableProperty
          */
         $useVerboseSyntax = true;
 
+        /*
+         * Show Table relations in header
+         */
+        $showIndexes = true;
+
         // create schema
         $YAML_dataTypes = createYAML_dataTypeSchema();
+
+        // get table info
+        $sqlQuery = "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '$table'";
+		$result=PMA_DBI_query($sqlQuery);
+
+        // get table relations
+        $sqlQuery = "SELECT * FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '$table'";
+        $result_rel=PMA_DBI_query($sqlQuery);
+
+        $tableRelations = array();
+        while ($row = PMA_DBI_fetch_assoc($result_rel))
+        {
+            $tableRelations[] = $row;
+            $referencedTable = $row["REFERENCED_TABLE_NAME"];
+            $referencedTableClass = toCamelCase($referencedTable, true);
+        }
 
         // build header
         if(!$useVerboseSyntax)
@@ -432,17 +454,27 @@ class TableProperty
          //   $lines[] = "detect_relations: true\n";
         }
 
+        if(!$showIndexes)
+        {
+            $str = ",indexes={@index(";
+            foreach($tableRelations as $key)
+            {
+
+            }
+            $str .= "name=\"search_idx\", columns={\"name\", \"email\"}";
+            $str .= ")}";
+            $lines[] = $str;
+        }
+
+
+
         // build body
-
-        $sqlQuery = "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '$table'";
-		$result=PMA_DBI_query($sqlQuery);
-
         if ($result)
 		{
 			$tableProperties=array();
 			while ($row = PMA_DBI_fetch_assoc($result))
             {
-               $tableProperties[] = new TableProperty($row);
+               $tableProperties[] = new TableProperty($row); //$lines[] = print_r($row);
             }
 
              // insert table Class Headers
@@ -462,12 +494,36 @@ class TableProperty
                  //insert property
                 $propName = toCamelCase( $tablePropertie->fields->name->schemaVal );
                 $lines[] = "	private $".$propName.";\n";
+
+
             }
 
+            // insert relations
+            $sqlQuery = "SELECT * FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '$table'";
+            $result2=PMA_DBI_query($sqlQuery);
+
+            while ($row = PMA_DBI_fetch_assoc($result2))
+            {
+
+                $referencedTable = $row["REFERENCED_TABLE_NAME"];
+                $referencedTableClass = toCamelCase($referencedTable, true);
+                if($referencedTable)
+                {
+                    $lines[] = "\t/**";
+                    $lines[] = "\t * @OneToOne(targetEntity=\"".$referencedTableClass."\")";
+                    $lines[] = "\t */";
+                    $lines[] = "	private $".$referencedTable.";\n";
+                }
+
+            }
+
+
+            // insert getters / setters
 			$lines[] = "\n";
 			foreach ($tableProperties as $tablePropertie)
             {
                 $functname = toCamelCase( $tablePropertie->fields->name->schemaVal, true );
+                $propName = toCamelCase( $tablePropertie->fields->name->schemaVal );
 
                 $lines[] = "	public function get".$functname."() \n\t{\n\t\treturn \$this->".$propName.";\n\t} \n";
                 $lines[] = "	public function set".$functname."($".$propName.") \n\t{\n\t\t\$this->".$propName." = \$".$propName.";\n\t} \n";
