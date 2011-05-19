@@ -40,10 +40,26 @@ if (isset($plugin_list)) {
           'options' => array(
           	array('type' => 'hidden', 'name' => 'data'),
             array('type' => 'select', 'name' => 'format', 'text' => 'strFormat', 'values' => $PARSE_FORMATS),
-            array('type' => 'bool', 'name' => 'strPutIndexes', 'text' => 'Include Indexes', 'values' => 'selected'),
             ),
         'options_text' => 'strOptions',
         );
+
+    $plugin_list['doctrine2']['options'][] =
+                array('type' => 'bool', 'name' => 'verbose', 'text' => 'Use Verbose Syntax');
+
+    $plugin_list['doctrine2']['options'][] =
+                array('type' => 'bool', 'name' => 'index', 'text' => 'Include Table Indexes', 'values'=> array('true', 'false'));
+
+    $plugin_list['doctrine2']['options'][] =
+                array('type' => 'bool', 'name' => 'relation', 'text' => 'Include Table Relations');
+
+
+
+    $GLOBALS['cfg']['Export']['doctrine2_verbose'] = true;
+    $GLOBALS['cfg']['Export']['doctrine2_index'] = false;
+    $GLOBALS['cfg']['Export']['doctrine2_relation'] = true;
+
+
 } else {
 
 
@@ -254,6 +270,7 @@ class TableProperty
         $this->fields = new stdClass();
 
         $this->fields->name = $this->mapEntity('COLUMN_NAME', 'name', $rowObj, false);
+        $this->fields->columnKey = $this->mapEntity('COLUMN_KEY', 'columnKey', $rowObj);
         $this->fields->fixed = $this->mapEntity('', 'fixed', $rowObj, false);
         $this->fields->autoincrement = $this->mapEntity('EXTRA', 'autoincrement', $rowObj);
         $this->fields->type = $this->mapEntity('DATA_TYPE', 'type', $rowObj);
@@ -261,7 +278,6 @@ class TableProperty
         $this->fields->default = $this->mapEntity('COLUMN_DEFAULT', 'default', $rowObj);
         $this->fields->scale = $this->mapEntity('NUMERIC_SCALE', 'scale', $rowObj, false);
         $this->fields->precision = $this->mapEntity('NUMERIC_PRECISION', 'precision', $rowObj, false);
-        $this->fields->columnKey = $this->mapEntity('COLUMN_KEY', 'columnKey', $rowObj);
         $this->fields->values =  $this->mapEntity('', 'enum', $rowObj, false);     // ??? needs identification
         $this->fields->comment = $this->mapEntity('COLUMN_COMMENT', 'comment', $rowObj, false);
         $this->fields->sequence = $this->mapEntity('', 'sequence', $rowObj, false);  // ??? needs identification
@@ -379,7 +395,13 @@ class TableProperty
                 if($count > 0 )
                     $deliminator = ', ';
 
-                // append verbose length to type field e.g. varchar(255)
+                // dont include non verbose properties
+                if(!$useVerboseSyntax)
+                {
+                    if($val->schemaName == 'length' || $val->schemaName == 'precision' || $val->schemaName == 'scale')
+                        continue;
+                }
+
                 switch($val->schemaName)
                 {
                     case "type":
@@ -405,6 +427,146 @@ class TableProperty
 
 }
 
+
+/**
+ *
+ * @package phpMyAdmin-Export-Doctrine
+ */
+class TableIndexes
+{
+    public $indexes;
+
+	function __construct($db, $table)
+	{
+        $this->indexes = array();
+
+        $raw_indexes = PMA_DBI_fetch_result('SHOW INDEX FROM ' . $db . '.' . $table);
+
+        foreach ($raw_indexes as $each_index)
+        {
+            $index =  new stdClass();
+            $index->name = $this->mapEntity('Key_name', 'name', $each_index);
+
+            // make columns array for index
+            $index->columns = new stdClass();
+            $index->columns->schemaName = 'columns';
+            $index->columns->schemaVal = array();
+            $index->columns->include = true;
+
+            // Only add this new index if it does not exist already
+            // If not, add the duplicates columns to the existing index's columns
+            $existingIndex = $this->isSameKeyName($index);
+            if(!$existingIndex)
+            {
+               $index->columns->schemaVal[] = $each_index['Column_name'];
+               $this->indexes[] = $index;
+
+            }
+            else
+            {
+               $existingIndex->columns->schemaVal[] = $each_index['Column_name'];
+            }
+        }//print_r($this->indexes);
+	}
+
+    /*
+     * Checks if this index name already exists
+     */
+    private function isSameKeyName($index)
+    {
+        foreach ($this->indexes as $existingIndex)
+        {
+            if($existingIndex->name->schemaVal == $index->name->schemaVal)
+            {
+                return $existingIndex;
+                break;
+            }
+        }
+        return false;
+    }
+
+    private function mapEntity($columnName, $columnSchemaName, $entityObj, $include=true)
+    {
+        $prop = new stdClass();
+
+        $prop->schemaName = $columnSchemaName;
+        $prop->schemaVal = $entityObj[$columnName];
+        $prop->include = $include;
+
+        return $prop;
+    }
+
+    /**
+     * Return a list of all indexes
+     *
+     * @param   boolean      return only foreign key indexes
+     * @return  array index columns
+     */
+
+    public function getIndexes($foreignKeysOnly=true)
+    {
+        $list = array();
+        foreach($this->indexes as $index)
+        {
+            if($foreignKeysOnly)
+            {
+                $found = false;
+
+                foreach($this->getIndexChoices() as $choice)
+                {
+                     if($index->name->schemaVal == $choice)
+                         $found = true;
+                         continue;
+                }
+                if(!$found)
+                    $list[] = $index;
+            }
+            else
+            {
+                $list[] = $index;
+            }
+        }
+        return $list;
+    }
+
+    /**
+     * Return a list of all index associated columns
+     *
+     * @return  array index columns
+     */
+
+    public function getIndexColumns($indexName)
+    {
+        $cols = array();
+        foreach($this->indexes as $index)
+        {
+            if($index->name->schemaVal == $indexName)
+            {
+                $col[] = $index->column;
+            }
+        }
+
+        return $cols;
+    }
+
+    /**
+     * Return a list of all index choices
+     *
+     * @return  array index choices
+     */
+    private function getIndexChoices()
+    {
+        return array(
+            'PRIMARY',
+            'INDEX',
+            'UNIQUE',
+            'FULLTEXT',
+        );
+    }
+}
+
+
+
     /*
      * ============================================================================
      */
@@ -422,12 +584,12 @@ class TableProperty
          *
          * If verbose is set to true ALL schema parameters will be included. This is recomended!
          */
-        $useVerboseSyntax = true;
+        $useVerboseSyntax = cgGetOption('verbose');
 
         /*
          * Show Table relations in header
          */
-        $showIndexes = true;
+        $showIndexes = cgGetOption('index');
 
         // create schema
         $YAML_dataTypes = createYAML_dataTypeSchema();
@@ -454,17 +616,7 @@ class TableProperty
          //   $lines[] = "detect_relations: true\n";
         }
 
-        if(!$showIndexes)
-        {
-            $str = ",indexes={@index(";
-            foreach($tableRelations as $key)
-            {
 
-            }
-            $str .= "name=\"search_idx\", columns={\"name\", \"email\"}";
-            $str .= ")}";
-            $lines[] = $str;
-        }
 
 
 
@@ -480,7 +632,49 @@ class TableProperty
              // insert table Class Headers
             $lines[] = "<?php\n";
 			$lines[] = "namespace models;";
-            $lines[] = "\n/**\n * @Entity\n * @Table(name=\"".$table."\")\n */\n";
+            $str = "\n/**\n * @Entity\n * @Table(name=\"".$table."\"";
+
+
+            // insert table indexes
+            if($showIndexes)
+            {
+                $tableIndexes = new TableIndexes($db, $table);
+                $indexes = $tableIndexes->getIndexes(true);
+
+                if(count($indexes) > 0)
+                {
+                    $indexCount = 0;
+                    $indexDeliminator = '';
+
+                    $str .= ", indexes={";
+                    foreach ($indexes as $index)
+                    {
+                        $columnsCount = 0;
+                        $columnDeliminator = '';
+
+                        if($indexCount > 0 )
+                            $indexDeliminator = ', ';
+
+                        $str .=  $indexDeliminator."@index(name=\"".$index->name->schemaVal."\", columns={";
+
+                        foreach ($index->columns->schemaVal as $col)
+                        {
+                            if($columnsCount > 0 )
+                                $columnDeliminator = ', ';
+
+                            $str .=  $columnDeliminator."\"".$col."\"";
+                            $columnsCount ++;
+                        }
+                        $str .= "})";
+                        $indexCount ++;
+                    }
+                    $str .= "}";
+                }
+
+
+            }
+            $str .= ")\n */\n";
+            $lines[] = $str;
 
             // insert class name
 			$lines[] = "class ".toCamelCase( $table, true )." {\n\n\n";
